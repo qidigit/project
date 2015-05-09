@@ -1,0 +1,10 @@
+test1: test1.c ../transform_s2/gauss_legendre.c ../transform_s2/legendre_polynomial.c ../transform_s2/transform_s2.c
+gcc -Wall -c test1.c -o test1.o -I../transform_s2
+
+cd ../transform_s2
+gcc -Wall -c gauss_legendre.c -I. -o ../test/gauss_legendre.o
+gcc -Wall -c legendre_polynomial.c -I. -o ../test/legendre_polynomial.o
+gcc -Wall -c transform_s2.c -I. -o ../test/transform_s2.o
+
+cd ../test
+gcc -Wall -o test1 test1.o transform_s2.o gauss_legendre.o legendre_polynomial.o -I../transform_s2 -lfftw3
