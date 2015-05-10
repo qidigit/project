@@ -28,6 +28,8 @@
 #include "../field_management/field_management.h"
 #include "transform_s2.h"
 
+#define MAX(x, y) (((x) > (y)) ? (x) : (y))
+
 int initialize_transform(int ind[], int sind[], legendre *trans)
 {
     double *weight;
@@ -143,7 +145,8 @@ int finalize_transform(legendre *trans)
 int transform_g2s(sphere_grid *xi_g, sphere_four *xi_f, sphere_spec *xi_s, legendre *trans)
 {
     int i, m, n;
-    int cur_ind;
+    int cur_p, cur_mul, cur_ind;
+    int bsize = xi_s->sind[2]*(M_rsv+2);
 
     int rproc, nproc; // define the mpi processors
     MPI_Comm_rank(MPI_COMM_WORLD, &rproc);
@@ -156,56 +159,47 @@ int transform_g2s(sphere_grid *xi_g, sphere_four *xi_f, sphere_spec *xi_s, legen
 
     // calculate spherical coeff. through Legendre transform
     // piece of transform inside the proc
-    complex **leg_sum;
-    leg_sum = (complex**) malloc(sizeof(complex*) * (M+1));
-    for (i = 0; i < M+1; i++) 
-        leg_sum[i] = (complex*) calloc(M+2-i, sizeof(complex));
+    complex *leg_sum;
+    leg_sum = (complex*) calloc((M+1)*(M_rsv+2), sizeof(complex*));
 
     for (m = 0; m < M+1; m++) {
-        for (n = 0; n < M+2-m; n++) {
+        // reorder the zonal wavenumber in order to save them in the same order in each proc
+        // further improvement for efficiency needs to store the modes better
+        cur_p = m % xi_s->sind[1];
+        cur_mul = (m-cur_p) / xi_s->sind[1];
+        cur_ind = cur_p*bsize + cur_mul;
+        for (n = 0; n < M_rsv+2-m; n++) {
 
             for (i = 0; i < xi_f->ind[2]; i++)
-                leg_sum[m][n] += trans->leg_trans_forward[m][n][i] * xi_f->u_four[i*(NY+1)+m];
+                leg_sum[cur_ind*(M_rsv+2)+n] += trans->leg_trans_forward[m][n][i] * xi_f->u_four[i*(NY+1)+m];
         }
     }
 
     // reduce with other processors.
-    complex *temp_order; // temp to store the data to reduce
-    temp_order = (complex*) calloc(xi_s->sind[2]*(M+2), sizeof(complex));
-    for (n = 0; n < nproc; n++) { // n for reduce the rproc n
-        // reallocate the array
-        for (m = 0; m < xi_s->sind[2]; m++) {
-            cur_ind = n+m*xi_s->sind[1];
-            for (i = 0; i < M+2-cur_ind; i++)
-                temp_order[m*(M+2)+i] = leg_sum[cur_ind][i];
-        }
-
-        printf("proc %d reached reduce point of proc %d\n", rproc, n);
-        if (rproc == n) { 
-            MPI_Reduce(MPI_IN_PLACE, temp_order, xi_s->sind[2]*(M+2), MPI_COMPLEX, MPI_SUM, n, MPI_COMM_WORLD);
-
-            for (m = 0; m < xi_s->sind[2]; m++) {
-                cur_ind = xi_s->sind[0]+m*xi_s->sind[1];
-                for (i = 0; i < M+2-cur_ind; i++)
-                    xi_s->u_spec[m][i] = temp_order[m*(M+2)+i];
-            }
-        } else {
-            MPI_Reduce(temp_order, temp_order, xi_s->sind[2]*(M+2), MPI_COMPLEX, MPI_SUM, n, MPI_COMM_WORLD);
-        }
-
-        /*
-        if (rproc == n) {
-            for (m = 0; m < xi_s->sind[2]; m++) {
-                cur_ind = xi_s->sind[0]+m*xi_s->sind[1];
-                for (i = 0; i < M+2-cur_ind; i++)
-                    xi_s->u_spec[m][i] = temp_order[m*(M+2)+i];
-            }
-        } */
-        MPI_Barrier(MPI_COMM_WORLD);
+    int root = 0;
+//    MPI_Allreduce(MPI_IN_PLACE, leg_sum, (M_rsv+1)*(M_rsv+2), MPI_C_DOUBLE_COMPLEX, MPI_SUM, MPI_COMM_WORLD);
+    if (rproc == root) {
+        MPI_Reduce(MPI_IN_PLACE, leg_sum, (M+1)*(M_rsv+2), MPI_C_DOUBLE_COMPLEX, MPI_SUM, root, MPI_COMM_WORLD);
+    } else {
+        MPI_Reduce(leg_sum,      leg_sum, (M+1)*(M_rsv+2), MPI_C_DOUBLE_COMPLEX, MPI_SUM, root, MPI_COMM_WORLD);
     }
-    free(temp_order);
 
-    for (i = 0; i < M+1; i++) free(leg_sum[i]);
+    complex *temp_order; // temp to store the reduced data
+    temp_order = (complex*) calloc(xi_s->sind[2]*(M_rsv+2), sizeof(complex));
+
+    // Scatter data to each proc
+    MPI_Scatter(leg_sum, bsize, MPI_C_DOUBLE_COMPLEX, temp_order, bsize, MPI_C_DOUBLE_COMPLEX, root, MPI_COMM_WORLD);
+    
+    // reallocate the array
+    for (m = 0; m < xi_s->sind[2]; m++) {
+        cur_ind = xi_s->sind[0]+m*xi_s->sind[1];
+        for (i = 0; i < M_rsv+2-cur_ind; i++)
+            xi_s->u_spec[m][i] = temp_order[m*(M_rsv+2)+i];
+        for (i = MAX(M_rsv+2-cur_ind, 0); i < M+2-cur_ind; i++) 
+            xi_s->u_spec[m][i] = 0;
+    }
+
+    free(temp_order);
     free(leg_sum);
     return 0;
 }
@@ -224,11 +218,19 @@ int transform_s2g(sphere_spec *xi_s, sphere_four *xi_f, sphere_grid *xi_g, legen
     complex *leg_dec;
     leg_dec = (complex*) calloc(NY * (xi_s->sind[2]), sizeof(complex));
 
+    // For safety: set the useless mode to 0 to avoid error; this should be guaranteed before enter
+    for (mi = 0; mi < xi_s->sind[2]; mi++) {
+        cur_ind = xi_s->sind[0]+mi*xi_s->sind[1];
+        for (i = MAX(M_rsv+2-cur_ind, 0); i < M+2-cur_ind; i++) 
+            xi_s->u_spec[mi][i] = 0;
+    }
+
+
     for (i = 0; i < NY; i++) {
         for (mi = 0; mi < xi_s->sind[2]; mi++) {
             cur_ind = xi_s->sind[0]+mi*xi_s->sind[1];
             
-            for (n = 0; n < M+2-cur_ind; n++)
+            for (n = 0; n < M_rsv+2-cur_ind; n++)
                 leg_dec[i*xi_s->sind[2]+mi] += trans->leg_trans_backward[i][mi][n] * xi_s->u_spec[mi][n];
         }
     }
@@ -236,7 +238,7 @@ int transform_s2g(sphere_spec *xi_s, sphere_four *xi_f, sphere_grid *xi_g, legen
     // communicate with other processors; note the constraint nproc*sind[2] = M+1
     complex *temp_order; // temp to store the disordered collection
     temp_order = (complex*) malloc(sizeof(complex) * (xi_f->ind[2]*(M+1)));
-    MPI_Alltoall(leg_dec,    bsize, MPI_COMPLEX, temp_order, bsize, MPI_COMPLEX, MPI_COMM_WORLD);
+    MPI_Alltoall(leg_dec, bsize, MPI_C_DOUBLE_COMPLEX, temp_order, bsize, MPI_C_DOUBLE_COMPLEX, MPI_COMM_WORLD);
     // reorder the received data, the orders in the initial setting-up MATTERS here!
     /* write in the order of output (write) file
     for (i = 0; i < xi_f->ind[2]; i++) {
@@ -251,23 +253,29 @@ int transform_s2g(sphere_spec *xi_s, sphere_four *xi_f, sphere_grid *xi_g, legen
     for (n = 0; n < nproc; n++) {
         for (i = 0; i < xi_f->ind[2]; i++) {
             for (mi = 0; mi < xi_s->sind[2]; mi++) {
-                xi_f->u_four[i*(NY+1) + mi*nproc + n] = temp_order[n*bsize + i*xi_s->sind[2] +mi];
+                xi_f->u_four[i*(NY+1) + mi*nproc + n] = temp_order[n*bsize + i*xi_s->sind[2] + mi];
             }
         }
     }
-    free(temp_order);
 
     // de-aliasing
     // or it may need to start at a smaller value M_res to show the real number of resolved mode
     for (i = 0; i < xi_f->ind[2]; i++) {
-        for (mi = M_res+1; mi < NY+2; mi++) {
+        for (mi = M_rsv+1; mi < NY+1; mi++) {
             xi_f->u_four[i*(NY+1) + mi] = 0;
         }
     }
+
+    // for test only
+//    for (i = 0; i < NY; i++) {
+//        printf("%12g+%12gi\n", creal(xi_f->u_four[i*(NY+1)+0]), cimag(xi_f->u_four[i*(NY+1)+0]));
+//    }
+
     // tansform from Fourier domain to grids, no normalization
     // NOTE original xi_f->u_four is destroyed after the inverse transform
     fftw_execute(xi_f->p_backward);
 
+    free(temp_order);
     free(leg_dec);
     return 0;
 }

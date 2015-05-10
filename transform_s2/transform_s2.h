@@ -22,7 +22,7 @@
 // model size defined from the input
 extern const int M, NY;
 extern const char trunc_type;
-extern const int M_res; // the real number of resolved modes (due to the equi-partition of modes in each processor)
+extern const int M_rsv; // the real number of resolved modes (due to the equi-partition of modes in each processor)
 
 // setup for gaussian quadrature points precision 
 #define EPS 1E-10
