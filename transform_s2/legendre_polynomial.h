@@ -30,6 +30,7 @@ double *pn_polynomial_value ( int m, int n, double x[] );
 double r8_add ( double x, double y );
 double r8_epsilon ( );
 double r8_factorial ( int n );
+double r8_factorial_quo ( int n, int m);
 double r8_sign ( double x );
 void r8mat_print ( int m, int n, double a[], char *title );
 void r8mat_print_some ( int m, int n, double a[], int ilo, int jlo, int ihi,

@@ -20,8 +20,8 @@
 #include <stdlib.h>
 #include <complex.h>
 #include <math.h>
-#include <fftw3.h>
 #include <omp.h>
+#include <fftw3.h>
 #include <mpi.h>
 #include "gauss_legendre.h"
 #include "legendre_polynomial.h"
@@ -91,6 +91,12 @@ int initialize_transform(int ind[], int sind[], legendre *trans)
     sind_count = 0;
     for (j = 0; j < M+1; j++) {
         pmn_vec = pmn_polynomial_value(NY, M+1, j, x_pos);
+
+        // for test purpose only
+//        if (j == 0) {
+//            double *pm_vec = pmn_polynomial_value(NY, M+1, j, x_pos);
+//            printf("pmn_vec modes = %f\n", pm_vec[NY*(M+1)]);
+//        }
 
         ind_count = 0;
         for (i = 0; i < NY; i++) {
@@ -163,6 +169,7 @@ int transform_g2s(sphere_grid *xi_g, sphere_four *xi_f, sphere_spec *xi_s, legen
     leg_sum_r = (double*) calloc((M+1)*(M_rsv+2), sizeof(double*));
     leg_sum_i = (double*) calloc((M+1)*(M_rsv+2), sizeof(double*));
 
+//    #pragma omp parallel for reduction(+: leg_sum_r, leg_sum_i) private(m, n, i, cur_p, cur_mul, cur_ind)
     for (m = 0; m < M+1; m++) {
         // reorder the zonal wavenumber in order to save them in the same order in each proc
         // further improvement for efficiency needs to store the modes better
@@ -177,6 +184,20 @@ int transform_g2s(sphere_grid *xi_g, sphere_four *xi_f, sphere_spec *xi_s, legen
             }
         }
     }
+
+    // for test only
+//    for (i = 0; i < M+2; i++) {
+//        printf("%12g+%12gi\n", creal(xi_f->u_four[i*(NY+1)+160]), cimag(xi_f->u_four[i*(NY+1)+160]));
+//    }
+//    printf("u_four test\n");
+//    for (i = 0; i < 2; i++) {
+//        printf("%12g %12g\n", trans->leg_trans_forward[M][i][0], trans->leg_trans_forward[M][i][NY-1]);
+//    }
+//    printf("legendre for test\n");
+//    for (i = 0; i < 2; i++) {
+//        printf("%12g %12g\n", trans->leg_trans_backward[0][M][i], trans->leg_trans_backward[NY-1][M][i]);
+//    }
+//    printf("legendre back test\n");
 
     // reduce with other processors.
     int root = 0;
@@ -197,6 +218,12 @@ int transform_g2s(sphere_grid *xi_g, sphere_four *xi_f, sphere_spec *xi_s, legen
     MPI_Scatter(leg_sum_r, bsize, MPI_DOUBLE, temp_order_r, bsize, MPI_DOUBLE, root, MPI_COMM_WORLD);
     MPI_Scatter(leg_sum_i, bsize, MPI_DOUBLE, temp_order_i, bsize, MPI_DOUBLE, root, MPI_COMM_WORLD);
     
+    // for test only
+//    for (i = 0; i < M+2; i++) {
+//        printf("%12g+%12gi\n", temp_order_r[0*(NY+1)+i], temp_order_i[0*(NY+1)+i]);
+//    }
+//    printf("temp_order test\n");
+
     // reallocate the array
     for (m = 0; m < xi_s->sind[2]; m++) {
         cur_ind = xi_s->sind[0]+m*xi_s->sind[1];
@@ -204,9 +231,9 @@ int transform_g2s(sphere_grid *xi_g, sphere_four *xi_f, sphere_spec *xi_s, legen
             xi_s->u_spec[m][i] = temp_order_r[m*(M_rsv+2)+i] + 
                                  I * temp_order_i[m*(M_rsv+2)+i];
         }
-//        for (i = MAX(M_rsv+2-cur_ind, 0); i < M+2-cur_ind; i++) {
-//            xi_s->u_spec[m][i] = 0;
-//        }
+        for (i = MAX(M_rsv+2-cur_ind, 0); i < M+2-cur_ind; i++) {
+            xi_s->u_spec[m][i] = 0;
+        }
     }
 
     free(temp_order_r);
@@ -232,11 +259,11 @@ int transform_s2g(sphere_spec *xi_s, sphere_four *xi_f, sphere_grid *xi_g, legen
     leg_dec_i = (double*) calloc(NY * (xi_s->sind[2]), sizeof(double));
 
     // For safety: set the useless mode to 0 to avoid error; this should be guaranteed before enter
-//    for (mi = 0; mi < xi_s->sind[2]; mi++) {
-//        cur_ind = xi_s->sind[0]+mi*xi_s->sind[1];
-//        for (i = MAX(M_rsv+2-cur_ind, 0); i < M+2-cur_ind; i++) 
-//            xi_s->u_spec[mi][i] = 0;
-//    }
+    for (mi = 0; mi < xi_s->sind[2]; mi++) {
+        cur_ind = xi_s->sind[0]+mi*xi_s->sind[1];
+        for (i = MAX(M_rsv+2-cur_ind, 0); i < M+2-cur_ind; i++) 
+            xi_s->u_spec[mi][i] = 0;
+    }
 
     // for test only
 //    for (i = 0; i < M+2; i++) {
@@ -248,6 +275,7 @@ int transform_s2g(sphere_spec *xi_s, sphere_four *xi_f, sphere_grid *xi_g, legen
 //    }
 //    printf("legendre test\n");
 
+//    #pragma omp parallel for reduction(+: leg_dec_r, leg_dec_i) private(i, mi, n, cur_ind)
     for (i = 0; i < NY; i++) {
         for (mi = 0; mi < xi_s->sind[2]; mi++) {
             cur_ind = xi_s->sind[0]+mi*xi_s->sind[1];
@@ -263,7 +291,7 @@ int transform_s2g(sphere_spec *xi_s, sphere_four *xi_f, sphere_grid *xi_g, legen
 //    for (i = 0; i < NY; i++) {
 //        printf("%12g+%12gi\n", leg_dec_r[i*(M+1)+0],    leg_dec_i[i*(M+1)+0]);
 //    }
-//    printf("next test\n");
+//    printf("leg_dec test\n");
 
     // communicate with other processors; note the constraint nproc*sind[2] = M+1
     double *temp_order_r, *temp_order_i; // temp to store the disordered collection
@@ -307,8 +335,15 @@ int transform_s2g(sphere_spec *xi_s, sphere_four *xi_f, sphere_grid *xi_g, legen
     }
 
     // for test only
+//    for (i = 0; i < xi_f->ind[2]; i++) {
+//        for (mi = 0; mi < NY+1; mi++) {
+//            if (xi_f->u_four[i*(NY+1) + mi] != xi_f->u_four[i*(NY+1) + mi] ) {
+//                printf("xi_f becomes NaN at i=%d, m=%d\n", i, mi);
+//            }        
+//        }
+//    }
 //    for (i = 0; i < NY; i++) {
-//        printf("%12g+%12gi\n", creal(xi_f->u_four[i*(NY+1)+0]), cimag(xi_f->u_four[i*(NY+1)+0]));
+//        printf("%12g+%12gi\n", creal(xi_f->u_four[i*(NY+1)+1]), cimag(xi_f->u_four[i*(NY+1)+1]));
 //    }
 
     // tansform from Fourier domain to grids, no normalization

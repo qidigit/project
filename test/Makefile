@@ -1,10 +1,11 @@
-EXECUTABLES = test1
+EXECUTABLES = test_trans
 CC = mpicc
 LFLAGS = -O3 -Wall
 
 ODIR = obj
 
-LIBS = -lm -lfftw3 -fopenmp -lfftw3_omp
+LIBS = -lm -lfftw3 -lfftw3_omp
+LIBOMP = -fopenmp
 
 IDIR1 = ../field_management
 _DEPS1 = field_management.h
@@ -16,24 +17,24 @@ DEPS2 = $(patsubst %,$(IDIR2)/%,$(_DEPS2))
 
 CFLAGS = -I$(IDIR1) -I$(IDIR2)
 
-_OBJ = test1.o field_management.o gauss_legendre.o legendre_polynomial.o transform_s2.o
+_OBJ = test_trans.o field_management.o gauss_legendre.o legendre_polynomial.o transform_s2.o
 OBJ = $(patsubst %,$(ODIR)/%,$(_OBJ))
 
 
 $(ODIR)/%.o: $(IDIR1)/%.c $(DEPS1)
-	$(CC) $(LFLAGS) -c -o $@ $< -I$(IDIR1)
+	$(CC) $(LFLAGS) $(LIBOMP) -c -o $@ $< -I$(IDIR1)
 
 $(ODIR)/%.o: $(IDIR2)/%.c $(DEPS1) $(DEPS2)
-	$(CC) $(LFLAGS) -c -o $@ $< -I$(IDIR2) -I$(IDIR1)
+	$(CC) $(LFLAGS) $(LIBOMP) -c -o $@ $< -I$(IDIR2) -I$(IDIR1)
 
-$(ODIR)/%.o: test1.c $(DEPS1) $(DEPS2)
-	$(CC) $(LFLAGS) -c -o $@ $< $(CFLAGS)
+$(ODIR)/%.o: test_trans.c $(DEPS1) $(DEPS2)
+	$(CC) $(LFLAGS) $(LIBOMP) -c -o $@ $< $(CFLAGS)
 
 
 all: $(EXECUTABLES)
 
-test1: $(OBJ)
-	$(CC) $(LFLAGS) -o $@ $^ $(CFLAGS) $(LIBS)
+test_trans: $(OBJ)
+	$(CC) $(LFLAGS) -o $@ $^ $(CFLAGS) $(LIBOMP) $(LIBS)
 
 clean:
 	rm -f $(ODIR)/*.o *~ $(EXECUTABLES)

@@ -1387,6 +1387,8 @@ double *pm_polynomial_value ( int mm, int n, int m, double x[] )
   Purpose:
 
     PM_POLYNOMIAL_VALUE evaluates the Legendre polynomials Pm(n,m,x).
+    the polynomial is partially normalized.
+    This function can ONLY be used by the following on pmn_polynomial_value under this correction.
 
   Differential equation:
 
@@ -1455,7 +1457,7 @@ double *pm_polynomial_value ( int mm, int n, int m, double x[] )
 
   Modified:
 
-    08 August 2013
+    13 May 2015 by Di Qi
 
   Author:
 
@@ -1516,18 +1518,24 @@ double *pm_polynomial_value ( int mm, int n, int m, double x[] )
       for ( i = 0; i < mm; i++ )
       {
         v[i+m*mm] = - v[i+m*mm] * fact * sqrt ( 1.0 - x[i] * x[i] );
+        // for normalization, added by Di Qi
+        v[i+m*mm] = v[i+m*mm] / sqrt((double) (2*k+1) * (2*k+2));
       }
       fact = fact + 2.0;
     }
   }
+
+  double fact1, fact2; // for normalization, added by Di Qi
 /*
   J = M + 1 is the second nonzero function.
 */
   if ( m + 1 <= n )
   {
+    fact1 = sqrt((double) (2*m+1));
     for ( i = 0; i < mm; i++ )
     {
       v[i+(m+1)*mm] = x[i] * ( double ) ( 2 * m + 1 ) * v[i+m*mm];
+      v[i+(m+1)*mm] = v[i+(m+1)*mm] / fact1;
     }
   }
 /*
@@ -1535,10 +1543,12 @@ double *pm_polynomial_value ( int mm, int n, int m, double x[] )
 */
   for ( j = m + 2; j <= n; j++ )
   {
+    fact1 = sqrt((double) (j-m)) / sqrt((double) (j+m));
+    fact2 = sqrt((double) (j-m) * (j-m-1)) / sqrt((double) (j+m) * (j+m-1));
     for ( i = 0; i < mm; i++ )
     {
-      v[i+j*mm] = ( ( double ) ( 2 * j     - 1 ) * x[i] * v[i+(j-1)*mm]
-                  + ( double ) (   - j - m + 1 ) *        v[i+(j-2)*mm] )
+      v[i+j*mm] = ( ( double ) ( 2 * j     - 1 ) * x[i] * v[i+(j-1)*mm] * fact1
+                  + ( double ) (   - j - m + 1 ) *        v[i+(j-2)*mm] * fact2 )
                   / ( double ) (     j - m     );
     }
   }
@@ -1562,7 +1572,9 @@ double *pmn_polynomial_value ( int mm, int n, int m, double x[] )
 
   Modified:
 
-    08 August 2013
+    13 May 2015
+    part of the normalization is carried out in the previous function pm_polynomial_value to avoid exceeding limits when (m, n) become large.
+    The corrections are done by Di Qi.
 
   Author:
 
@@ -1602,13 +1614,22 @@ double *pmn_polynomial_value ( int mm, int n, int m, double x[] )
 */
   for ( j = m; j <= n; j++ )
   {
-    factor = sqrt ( ( ( double ) ( 2 * j + 1 ) * r8_factorial ( j - m ) )
-      / ( 2.0 * r8_factorial ( j + m ) ) );
+    // for test purpose only
+//    if (j == n) {
+//        printf("v pri mode = %f\n", v[j*mm]);
+//    }
+
+    factor = sqrt ( ( ( double ) ( 2 * j + 1 ) )
+      / ( 2.0 ) );
     if (m&1) factor = (-1) * factor;
     for ( i = 0; i < mm; i++ )
     {
       v[i+j*mm] = v[i+j*mm] * factor;
     }
+    // for test purpose only
+//    if (j == n) {
+//        printf("v mode = %f, factor = %f\n", v[j*mm], factor);
+//    }
   }
 
   return v;
@@ -1821,6 +1842,7 @@ double *pmns_polynomial_value ( int mm, int n, int m, double x[] )
 */
   for ( j = m; j <= n; j++ )
   {
+
     factor = sqrt ( ( ( double ) ( 2 * j + 1 ) * r8_factorial ( j - m ) )
       / ( 4.0 * pi * r8_factorial ( j + m ) ) );
     for ( i = 0; i < mm; i++ )
@@ -2347,6 +2369,55 @@ double r8_factorial ( int n )
   return value;
 }
 /******************************************************************************/
+
+
+double r8_factorial_quo ( int n, int m )
+
+/******************************************************************************/
+/*
+  Purpose:
+
+    R8_FACTORIAL computes the factorial of N.
+
+  Discussion:
+
+    factorial_quo ( N, M ) = product ( 1 <= I <= N ) I /
+                             product ( 1 <= I <= M ) I
+
+
+  Licensing:
+
+    This code is distributed under the GNU LGPL license.
+
+  Modified:
+
+    12 May 2015
+
+  Author:
+
+    Di Qi
+
+*/
+{
+  int i;
+  double value;
+
+  if ((n > m) || (n < 0)) {
+      printf("Factorial error!\n");
+      return(EXIT_FAILURE);
+  }
+
+  value = (double) (n+1);
+
+  for ( i = n+1; i <= m; i++ )
+  {
+    value = value * ( double ) ( i );
+  }
+
+  return value;
+}
+/******************************************************************************/
+
 
 double r8_sign ( double x )
 

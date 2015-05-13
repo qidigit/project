@@ -37,7 +37,7 @@ typedef struct {
 
 // field in spectral domain under spherical harmonics, of size (sind[2]) * (M+2-m) 2d, the spherical modes is of wavenumber m:M+1 according to zonal mode m>=0.
 typedef struct {
-    complex **u_spec;
+    double complex **u_spec;
     int sind[3];
 } sphere_spec;
 

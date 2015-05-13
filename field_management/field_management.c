@@ -60,14 +60,14 @@ int initialize_fields(int ind[], int sind[], sphere_grid *xi_g, sphere_four *xi_
     switch(trunc_type)
     {
     case 'r' :
-        xi_s->u_spec = (complex**) malloc(sizeof(complex*) * sind[2]);
+        xi_s->u_spec = (double complex**) malloc(sizeof(double complex*) * sind[2]);
         if (xi_s->u_spec == NULL) {
             printf("spectral field initilization failure!\n");
             return(EXIT_FAILURE);
         }
 
         for (i = 0; i < sind[2]; i++) {
-            xi_s->u_spec[i] = (complex*) malloc(sizeof(complex) * (M+2));
+            xi_s->u_spec[i] = (double complex*) malloc(sizeof(double complex) * (M+2));
             if (xi_s->u_spec[i] == NULL) {
                 printf("spectral field initilization failure!\n");
                 return(EXIT_FAILURE);
@@ -75,14 +75,14 @@ int initialize_fields(int ind[], int sind[], sphere_grid *xi_g, sphere_four *xi_
         }
         break;
     case 't' :
-        xi_s->u_spec = (complex**) malloc(sizeof(complex*) * sind[2]);
+        xi_s->u_spec = (double complex**) malloc(sizeof(double complex*) * sind[2]);
         if (xi_s->u_spec == NULL) {
             printf("spectral field initilization failure!\n");
             return(EXIT_FAILURE);
         }
 
         for (i = 0; i < sind[2]; i++) {
-            xi_s->u_spec[i] = (complex*) malloc(sizeof(complex) * (M+2-sind[0]-i*sind[1]));
+            xi_s->u_spec[i] = (double complex*) malloc(sizeof(double complex) * (M+2-sind[0]-i*sind[1]));
             if (xi_s->u_spec[i] == NULL) {
                 printf("spectral field initilization failure!\n");
                 return(EXIT_FAILURE);
