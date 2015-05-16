@@ -156,7 +156,7 @@ int laplace_forward(spec_field *psi_in, spec_field *curl_out)
     for (m = 0; m < psi_in->sind[2]; m++) {
         cur_ind = psi_in->sind[0]+m*psi_in->sind[1];
         for (n = 0; n < M_rsv+1-cur_ind; n++) {
-            curl_out->spec[m][n] = - (double) (n+cur_ind) * (double) (n+1+cur_ind) * psi_in->spec[m][n];
+            curl_out->spec[m][n] = (-1.0) * (double) (n+cur_ind) * (double) (n+1+cur_ind) * psi_in->spec[m][n];
         }
 
         // set the unused mode zero
@@ -172,7 +172,7 @@ int laplace_backward(spec_field *curl_in, spec_field *psi_out)
     for (m = 0; m < curl_in->sind[2]; m++) {
         cur_ind = curl_in->sind[0]+m*curl_in->sind[1];
         for (n = 0; n < M_rsv+1-cur_ind; n++) {
-            psi_out->spec[m][n] = - curl_in->spec[m][n] / ((double) (n+cur_ind) * (double) (n+1+cur_ind));
+            psi_out->spec[m][n] = (-1.0) * curl_in->spec[m][n] / ((double) (n+cur_ind) * (double) (n+1+cur_ind));
         }
 
         // set the unused mode zero
@@ -181,3 +181,86 @@ int laplace_backward(spec_field *curl_in, spec_field *psi_out)
     return 0;
 }
 
+int laplace_order(spec_field *psi_in, spec_field *psi_out, int lorder)
+{
+    int m, n, i;
+    int cur_ind;
+    double sigma;
+
+    for (m = 0; m < psi_in->sind[2]; m++) {
+        cur_ind = psi_in->sind[0]+m*psi_in->sind[1];
+        for (n = 0; n < M_rsv+1-cur_ind; n++) {
+            sigma = 1;
+            for (i = 0; i < lorder; i++) {
+                sigma = (-1.0) * sigma * (double) (n+cur_ind) * (double) (n+1+cur_ind) / (RADIUS*RADIUS);
+            }
+//            sigma = (double) (n+cur_ind) * (double) (n+1+cur_ind) / (RADIUS*RADIUS);
+//            sigma = pow(sigma, damping_order);
+
+            psi_out->spec[m][n] = sigma * psi_in->spec[m][n];
+        }
+
+        // set the unused mode zero
+        psi_out->spec[m][M_rsv+1-cur_ind] = 0;
+    }
+    
+    return 0;
+}
+
+// calculate spectral damping, additional hyperdiffusion in psi_in is added to increament incr_out
+int spectral_damping(spec_field *psi_in, spec_field *incr_out)
+{
+    int m, n, i;
+    int cur_ind;
+    double sigma;
+
+    for (m = 0; m < psi_in->sind[2]; m++) {
+        cur_ind = psi_in->sind[0]+m*psi_in->sind[1];
+        for (n = 0; n < M_rsv+1-cur_ind; n++) {
+
+            sigma = 1;
+            for (i = 0; i < damping_order; i++) {
+                sigma = sigma * (double) (n+cur_ind) * (double) (n+1+cur_ind) / (RADIUS*RADIUS);
+            }
+//            sigma = (double) (n+cur_ind) * (double) (n+1+cur_ind) / (RADIUS*RADIUS);
+//            sigma = pow(sigma, damping_order);
+            incr_out->spec[m][n] = incr_out->spec[m][n] - damping_coeff * sigma * psi_in->spec[m][n];
+        }
+
+        // for safety, set the unused mode zero
+        incr_out->spec[m][M_rsv+1-cur_ind] = 0;
+    }
+    return 0;
+}
+
+
+int multi_mu_to_spec(spec_field *psi_in, spec_field *multi_psi)
+{
+    int m, n;
+    double eps_mn, eps_mn1;
+
+    int cur_ind;
+
+    // calculate spectral modes
+    for (m = 0; m < psi_in->sind[2]; m++) {
+        cur_ind = psi_in->sind[0]+m*psi_in->sind[1];
+        for (n = 0; n < M_rsv+2-cur_ind; n++) {
+            multi_psi->spec[m][n] = 0;
+
+            if ((n+cur_ind) > 0) {
+                eps_mn  = sqrt((double) ((n+cur_ind)*(n+cur_ind) - cur_ind * cur_ind) /
+                           (double) (4 * (n+cur_ind)*(n+cur_ind) - 1));
+
+                multi_psi->spec[m][n] += eps_mn * psi_in->spec[m][n-1];
+            }
+            if ((n+cur_ind) < (M_rsv+1)) {
+                eps_mn1 = sqrt((double) ((n+1+cur_ind)*(n+1+cur_ind) - cur_ind * cur_ind) /
+                           (double) (4 * (n+1+cur_ind)*(n+1+cur_ind) - 1));
+
+                multi_psi->spec[m][n] = eps_mn1 * psi_in->spec[m][n+1]; 
+            }
+        }
+    }
+
+    return 0;
+}

@@ -23,26 +23,33 @@
 extern int M, NY; // the number of resolved zonal waves and meridional grid points
 extern int M_rsv; // actual resolved number of zonal waves
 extern char trunc_type; // truncation type
+extern double TT; // total time to calculate
 
 // diffusion & damping
 extern int damping_order;
 extern double damping_coeff;
 
+// integration time step
+extern double delta_t;
+// Robert filter weight
+extern double robert;
+
 // physical constants
-extern const double RADIUS;
-extern const double OMEGA;
-extern const double GRAV;
-extern const double RDGAS;
-extern const double KAPPA;
-extern const double CP_AIR; 
-extern const double CP_OCEAN;
-extern const double RHO0;
-extern const double RHO0R;
-extern const double RHO_CP;
+#define RADIUS 6371.0e3
+#define OMEGA 7.292e-5
+#define GRAV 9.80
+#define RDGAS 287.04
+#define KAPPA 2.0/7.0
+#define CP_AIR 287.04/2.0*7.0 
+#define CP_OCEAN 3989.24495292815
+#define RHO0 1.035e3
+#define RHO0R 1.0/1.035e3
+#define RHO_CP 1.035e3*3989.24495292815
 
 // other important constants
-extern const double PI;
-extern const double DELVIN;
+#define PI 3.1415926535897932384626433832795028841971693993751
+#define KELVIN 273.15
+
 
 int initial_resolution();
 #endif /* MODEL_CONSTANTS */

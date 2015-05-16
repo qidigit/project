@@ -37,4 +37,12 @@ int uv_grid_from_div_curl(spec_field *div_s, spec_field *curl_s, legendre *trans
 // Note these functions can be only applied to psi, xi (or div, curl)
 int laplace_forward(spec_field *psi_in, spec_field *curl_out);
 int laplace_backward(spec_field *curl_in, spec_field *psi_out);
+// this function calculates the laplace with order lorder (\nepla^(2*lorder))
+int laplace_order(spec_field *psi_in, spec_field *psi_out, int lorder);
+
+// This can only be used to add hyperdiffusion to spectral modes
+int spectral_damping(spec_field *psi_in, spec_field *incr_out);
+
+// This is one additional function to calculate the spectral modes of (mu * R)_mn
+int multi_mu_to_spec(spec_field *psi_in, spec_field *multi_psi);
 #endif /* SPECTRAL_DIFF_H */

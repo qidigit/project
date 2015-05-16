@@ -26,9 +26,13 @@ int NY = 256;
 int M = 171;
 int M_rsv = 170;
 char trunc_type = 't';
+double TT = 30 * 24 * 60 * 60;
 
 int damping_order = 4;
 double damping_coeff = 1.0e-3;
+
+double delta_t = 1800.0;
+double robert = 0.04;
 
 
 /* ------------ physical constants ---------------
@@ -64,20 +68,22 @@ double damping_coeff = 1.0e-3;
  *  </DATA>
  */
 
-const double RADIUS = 6371.0e3;
-const double OMEGA  = 7.292e-5;
-const double GRAV   = 9.80;
-const double RDGAS  = 287.04;
-const double KAPPA  = 2.0/7.0;
-const double CP_AIR = 287.04/2.0*7.0; 
-const double CP_OCEAN = 3989.24495292815;
-const double RHO0    = 1.035e3;
-const double RHO0R   = 1.0/1.035e3;
-const double RHO_CP  = 1.035e3*3989.24495292815;
+/* const double RADIUS = 6371.0e3;
+ * const double OMEGA  = 7.292e-5;
+ * const double GRAV   = 9.80;
+ * const double RDGAS  = 287.04;
+ * const double KAPPA  = 2.0/7.0;
+ * const double CP_AIR = 287.04/2.0*7.0; 
+ * const double CP_OCEAN = 3989.24495292815;
+ * const double RHO0    = 1.035e3;
+ * const double RHO0R   = 1.0/1.035e3;
+ * const double RHO_CP  = 1.035e3*3989.24495292815;
+ */
 
 
-const double PI = 3.1415926535897932384626433832795028841971693993751;
-const double KELVIN = 273.15;
+/* const double PI = 3.1415926535897932384626433832795028841971693993751;
+ * const double KELVIN = 273.15;
+ */
 
 
 // initialize distributed modes and resolved modes M, M_rsv from NY
