@@ -19,11 +19,11 @@
 #ifndef _BAROTROPIC_H
 #define _BAROTROPIC_H
 
-extern trans_group *u_gp, *v_gp, *curl_gp;
-extern spec_field *delta_curl, *curl_pre, *curl_post;
-extern spec_field *psi_s, *pot_s;
-extern grid_field *freq;
-extern legend *trans;
+extern trans_group u_gp, v_gp, curl_gp;
+extern spec_field delta_curl, curl_pre, curl_post;
+extern spec_field psi_s, pot_s;
+extern grid_field freq;
+extern legendre trans;
 
 int initialize_barotropic();
 int finalize_barotropic();

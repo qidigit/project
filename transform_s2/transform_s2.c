@@ -23,6 +23,7 @@
 #include <omp.h>
 #include <fftw3.h>
 #include <mpi.h>
+#include "../model_constants/model_constants.h"
 #include "gauss_legendre.h"
 #include "legendre_polynomial.h"
 #include "../field_management/field_management.h"
@@ -358,4 +359,164 @@ int transform_s2g(sphere_spec *xi_s, sphere_four *xi_f, sphere_grid *xi_g, legen
     return 0;
 }
 
+
+
+int transform_group_forward(trans_group *xi, legendre *trans)
+{
+    int i, m, n;
+    int cur_p, cur_mul, cur_ind;
+    int bsize = xi->sind[2]*(M_rsv+2);
+
+    int rproc, nproc; // define the mpi processors
+    MPI_Comm_rank(MPI_COMM_WORLD, &rproc);
+    MPI_Comm_size(MPI_COMM_WORLD, &nproc);
+
+    // transform from grids to Fourier domain, with normalization 2*NY
+    fftw_execute(xi->gp_forward);
+    // normalization
+    for (i = 0; i < (NY+1)*xi->ind[2]; i++) xi->four[i] /= (2*NY);
+
+    // calculate spherical coeff. through Legendre transform
+    // piece of transform inside the proc
+    double *leg_sum_r, *leg_sum_i;
+    leg_sum_r = (double*) calloc((M+1)*(M_rsv+2), sizeof(double*));
+    leg_sum_i = (double*) calloc((M+1)*(M_rsv+2), sizeof(double*));
+
+//    #pragma omp parallel for reduction(+: leg_sum_r, leg_sum_i) private(m, n, i, cur_p, cur_mul, cur_ind)
+    for (m = 0; m < M+1; m++) {
+        // reorder the zonal wavenumber in order to save them in the same order in each proc
+        // further improvement for efficiency needs to store the modes better
+        cur_p = m % xi->sind[1];
+        cur_mul = (m-cur_p) / xi->sind[1];
+        cur_ind = cur_p*xi->sind[2] + cur_mul;
+        for (n = 0; n < M_rsv+2-m; n++) {
+
+            for (i = 0; i < xi->ind[2]; i++) {
+                leg_sum_r[cur_ind*(M_rsv+2)+n] += trans->leg_trans_forward[m][n][i] * creal(xi->four[i*(NY+1)+m]);
+                leg_sum_i[cur_ind*(M_rsv+2)+n] += trans->leg_trans_forward[m][n][i] * cimag(xi->four[i*(NY+1)+m]);
+            }
+        }
+    }
+
+    // reduce with other processors.
+    int root = 0;
+//    MPI_Allreduce(MPI_IN_PLACE, leg_sum, (M_rsv+1)*(M_rsv+2), MPI_C_DOUBLE_COMPLEX, MPI_SUM, MPI_COMM_WORLD);
+    if (rproc == root) {
+        MPI_Reduce(MPI_IN_PLACE, leg_sum_r, (M+1)*(M_rsv+2), MPI_DOUBLE, MPI_SUM, root, MPI_COMM_WORLD);
+        MPI_Reduce(MPI_IN_PLACE, leg_sum_i, (M+1)*(M_rsv+2), MPI_DOUBLE, MPI_SUM, root, MPI_COMM_WORLD);
+    } else {
+        MPI_Reduce(leg_sum_r,    leg_sum_r, (M+1)*(M_rsv+2), MPI_DOUBLE, MPI_SUM, root, MPI_COMM_WORLD);
+        MPI_Reduce(leg_sum_i,    leg_sum_i, (M+1)*(M_rsv+2), MPI_DOUBLE, MPI_SUM, root, MPI_COMM_WORLD);
+    }
+
+    double *temp_order_r, *temp_order_i; // temp to store the reduced data
+    temp_order_r = (double*) calloc(xi->sind[2]*(M_rsv+2), sizeof(double));
+    temp_order_i = (double*) calloc(xi->sind[2]*(M_rsv+2), sizeof(double));
+
+    // Scatter data to each proc
+    MPI_Scatter(leg_sum_r, bsize, MPI_DOUBLE, temp_order_r, bsize, MPI_DOUBLE, root, MPI_COMM_WORLD);
+    MPI_Scatter(leg_sum_i, bsize, MPI_DOUBLE, temp_order_i, bsize, MPI_DOUBLE, root, MPI_COMM_WORLD);
+    
+
+    // reallocate the array
+    for (m = 0; m < xi->sind[2]; m++) {
+        cur_ind = xi->sind[0]+m*xi->sind[1];
+        for (i = 0; i < M_rsv+2-cur_ind; i++) {
+            xi->spec[m][i] = temp_order_r[m*(M_rsv+2)+i] + 
+                             I * temp_order_i[m*(M_rsv+2)+i];
+        }
+        for (i = MAX(M_rsv+2-cur_ind, 0); i < M+2-cur_ind; i++) {
+            xi->spec[m][i] = 0;
+        }
+    }
+
+    free(temp_order_r);
+    free(temp_order_i);
+    free(leg_sum_r);
+    free(leg_sum_i);
+    return 0;
+}
+
+int transform_group_backward(trans_group *xi, legendre *trans)
+{
+    int i, mi, n;
+    int cur_ind;
+
+    int bsize = xi->ind[2]*xi->sind[2];
+    int rproc, nproc; // define the mpi processors
+    MPI_Comm_rank(MPI_COMM_WORLD, &rproc);
+    MPI_Comm_size(MPI_COMM_WORLD, &nproc);
+
+    // calculate the Fourier coeff. from available spherical modes sind[0]:sind[1]:sind[0]+sind[2]*sind[1]
+    double *leg_dec_r, *leg_dec_i;
+    leg_dec_r = (double*) calloc(NY * (xi->sind[2]), sizeof(double));
+    leg_dec_i = (double*) calloc(NY * (xi->sind[2]), sizeof(double));
+
+    // For safety: set the useless mode to 0 to avoid error; this should be guaranteed before enter
+    for (mi = 0; mi < xi->sind[2]; mi++) {
+        cur_ind = xi->sind[0]+mi*xi->sind[1];
+        for (i = MAX(M_rsv+2-cur_ind, 0); i < M+2-cur_ind; i++) 
+            xi->spec[mi][i] = 0;
+    }
+
+
+//    #pragma omp parallel for reduction(+: leg_dec_r, leg_dec_i) private(i, mi, n, cur_ind)
+    for (i = 0; i < NY; i++) {
+        for (mi = 0; mi < xi->sind[2]; mi++) {
+            cur_ind = xi->sind[0]+mi*xi->sind[1];
+            
+            for (n = 0; n < M_rsv+2-cur_ind; n++) {
+                leg_dec_r[i*xi->sind[2]+mi] += trans->leg_trans_backward[i][mi][n] * creal(xi->spec[mi][n]);
+                leg_dec_i[i*xi->sind[2]+mi] += trans->leg_trans_backward[i][mi][n] * cimag(xi->spec[mi][n]);
+            }
+        }
+    }
+
+
+    // communicate with other processors; note the constraint nproc*sind[2] = M+1
+    double *temp_order_r, *temp_order_i; // temp to store the disordered collection
+    temp_order_r = (double*) malloc(sizeof(double) * (xi->ind[2]*(M+1)));
+    temp_order_i = (double*) malloc(sizeof(double) * (xi->ind[2]*(M+1)));
+    MPI_Alltoall(leg_dec_r, bsize, MPI_DOUBLE, temp_order_r, bsize, MPI_DOUBLE, MPI_COMM_WORLD);
+    MPI_Alltoall(leg_dec_i, bsize, MPI_DOUBLE, temp_order_i, bsize, MPI_DOUBLE, MPI_COMM_WORLD);
+    // reorder the received data, the orders in the initial setting-up MATTERS here!
+    /* write in the order of output (write) file
+    for (i = 0; i < xi->ind[2]; i++) {
+        for (mi = 0; mi < xi->sind[2]; mi++) {
+            for (n = 0; n < nproc; n++) {
+                xi->four[i*(NY+1) + mi*nproc + n] = temp_order[n*bsize + i*xi->sind[2] + mi];
+            }
+        }
+    } */
+
+
+    /* read in the order of input (read) file */
+    for (n = 0; n < nproc; n++) {
+        for (i = 0; i < xi->ind[2]; i++) {
+            for (mi = 0; mi < xi->sind[2]; mi++) {
+                xi->four[i*(NY+1) + mi*nproc + n] = temp_order_r[n*bsize + i*xi->sind[2] + mi] + 
+                                                    I * temp_order_i[n*bsize + i*xi->sind[2] + mi];
+            }
+        }
+    }
+
+    // de-aliasing
+    // or it may need to start at a smaller value M_res to show the real number of resolved mode
+    for (i = 0; i < xi->ind[2]; i++) {
+        for (mi = M_rsv+1; mi < NY+1; mi++) {
+            xi->four[i*(NY+1) + mi] = 0;
+        }
+    }
+
+    // tansform from Fourier domain to grids, no normalization
+    // NOTE original xi->four is destroyed after the inverse transform
+    fftw_execute(xi->gp_backward);
+//    fftw_execute_dft_c2r(xi->gp_backward, xi->four, xi->grid);
+
+    free(temp_order_r);
+    free(temp_order_i);
+    free(leg_dec_r);
+    free(leg_dec_i);
+    return 0;
+}
 

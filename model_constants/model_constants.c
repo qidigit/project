@@ -26,12 +26,13 @@ int NY = 256;
 int M = 171;
 int M_rsv = 170;
 char trunc_type = 't';
-double TT = 30 * 24 * 60 * 60;
+double TT = 1; // number of days to run
 
 int damping_order = 4;
 double damping_coeff = 1.0e-3;
 
 double delta_t = 1800.0;
+double delta_at = 1800.0;
 double robert = 0.04;
 
 

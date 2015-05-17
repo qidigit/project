@@ -20,12 +20,12 @@
 #define _TRANSFORM_S2_H
 
 // model size defined from the input
-extern const int M, NY;
-extern const char trunc_type;
-extern const int M_rsv; // the real number of resolved modes (due to the equi-partition of modes in each processor)
+//extern const int M, NY;
+//extern const char trunc_type;
+//extern const int M_rsv; // the real number of resolved modes (due to the equi-partition of modes in each processor)
 
 // setup for gaussian quadrature points precision 
-#define EPS 1E-10
+#define EPS 1E-20
 
 /* struc legendre defines the legendre transform in latitude direction. 
  * legendre_points defines the NY gauss-legendre quadrature points (with symmetry between 0);
@@ -50,6 +50,10 @@ int initialize_transform(int ind[], int sind[], legendre *trans);
 
 int transform_g2s(sphere_grid *xi_g, sphere_four *xi_f, sphere_spec *xi_s, legendre *trans);
 int transform_s2g(sphere_spec *xi_s, sphere_four *xi_f, sphere_grid *xi_g, legendre *trans);
+
+// transforms in field group
+int transform_group_forward(trans_group *xi, legendre *trans);  // grid -> spec
+int transform_group_backward(trans_group *xi, legendre *trans); // spec -> grid
 
 int finalize_transform(legendre *trans);
 

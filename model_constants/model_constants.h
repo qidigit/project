@@ -31,6 +31,8 @@ extern double damping_coeff;
 
 // integration time step
 extern double delta_t;
+// time to save data
+extern double delta_at;
 // Robert filter weight
 extern double robert;
 

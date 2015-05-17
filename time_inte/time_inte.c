@@ -21,6 +21,7 @@
 #include <complex.h>
 #include <math.h>
 #include <omp.h>
+#include <fftw3.h>
 #include <mpi.h>
 #include "../model_constants/model_constants.h"
 #include "../field_management/field_management.h"

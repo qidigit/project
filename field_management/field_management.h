@@ -19,10 +19,6 @@
 #ifndef _FIELD_MANAGEMENT_H
 #define _FIELD_MANAGEMENT_H
 
-// model size defined from the input
-extern const int M, NY;
-extern const char trunc_type;
-
 
 // define the fields in physical and spectral domains
 /* ind[0] = index_start, ind[1] = increment, ind[2] = size of stencil.
@@ -48,6 +44,29 @@ typedef struct {
     int ind[3];
 } sphere_four;
 
+// the following two structures are used for forward & backward spectral transform during the calculation
+typedef struct {
+    double *grid;
+    fftw_complex *four;
+    double complex **spec;
+
+    int ind[3];
+    int sind[3];
+
+    fftw_plan gp_forward;
+    fftw_plan gp_backward;
+} trans_group;
+
+// the following two structures are used to define single scalar field in physical or spectral domain purely
+typedef struct {
+    double *grid;
+    int ind[3];
+} grid_field;
+typedef struct {
+    double complex **spec;
+    int sind[3];
+} spec_field;
+
 
 int initialize_fields(int ind[], int sind[], sphere_grid *xi_g, sphere_four *xi_f, sphere_spec *xi_s);
 
@@ -55,4 +74,12 @@ int finalize_fields(sphere_grid *xi_g, sphere_four *xi_f, sphere_spec *xi_s);
 
 int initialize_fft_plan(sphere_grid *xi_g, sphere_four *xi_f);
 
+int initialize_grid_field(int ind[], grid_field *u_g);
+int finalize_grid_field(grid_field *u_g);
+int initialize_spec_field(int sind[], spec_field *u_s);
+int finalize_spec_field(spec_field *u_s);
+
+int initialize_trans_group(int ind[], int sind[], trans_group *xi);
+int finalize_trans_group(trans_group *xi);
+int initialize_group_fft_plan(trans_group *xi);
 #endif /* FIELD_MANAGEMENT_H */

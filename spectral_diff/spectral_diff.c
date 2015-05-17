@@ -60,6 +60,38 @@ int div_spec_from_uv_grid(trans_group *u_gp, trans_group *v_gp, legendre *trans,
     transform_group_forward(u_gp, trans);
     transform_group_forward(v_gp, trans);
 
+        // for test purpose
+//        int start = 10;
+//        printf("uv spec\n");
+//        for (i = 0; i < M+2; i++) {
+//            printf("%12g+%12gi\n", creal(v_gp->spec[start][i]), cimag(v_gp->spec[start][i]));
+//        }
+//        for (m = 0; m < u_gp->sind[2]; m++) {
+//            cur_ind = u_gp->sind[0]+m*u_gp->sind[1];
+//            for (n = 0; n < M+2-cur_ind; n++) {
+//                if (isnan(creal(v_gp->spec[m][n])) || isnan(cimag(v_gp->spec[m][n])) ) {
+//                    printf("uv spec becomes NaN at m=%d, n=%d\n", m, n);
+//                }        
+//            }
+//        }
+//        printf("\n");
+
+
+//        int start = 6;
+//        printf("div spec\n");
+//        for (i = 0; i < M+2; i++) {
+//            printf("%12g+%12gi\n", creal(div_s->spec[start][i]), cimag(div_s->spec[start][i]));
+//        }
+//        for (m = 0; m < div_s->sind[2]; m++) {
+//            cur_ind = div_s->sind[0]+m*div_s->sind[1];
+//            for (n = 0; n < M+2-cur_ind; n++) {
+//                if (isnan(creal(div_s->spec[m][n])) || isnan(cimag(div_s->spec[m][n])) ) {
+//                    printf("div spec becomes NaN at m=%d, n=%d\n", m, n);
+//                }        
+//            }
+//        }
+//        printf("\n");
+
     // calculate divergence
     for (m = 0; m < div_s->sind[2]; m++) {
         cur_ind = div_s->sind[0]+m*div_s->sind[1];
@@ -69,7 +101,7 @@ int div_spec_from_uv_grid(trans_group *u_gp, trans_group *v_gp, legendre *trans,
             div_s->spec[m][n] = (I * (double) cur_ind) * u_gp->spec[m][n] +
                                 (double) (n + cur_ind) * eps_mn1 * v_gp->spec[m][n+1];
             
-            if ((n+cur_ind) > 0) {
+            if ( n > 0 ) {
                 eps_mn  = sqrt((double) ((n+cur_ind)*(n+cur_ind) - cur_ind * cur_ind) /
                            (double) (4 * (n+cur_ind)*(n+cur_ind) - 1));
                 div_s->spec[m][n] -= (double) (n+1+cur_ind) * eps_mn * v_gp->spec[m][n-1];
@@ -80,6 +112,23 @@ int div_spec_from_uv_grid(trans_group *u_gp, trans_group *v_gp, legendre *trans,
         // set the additional unused mode to be zero
         div_s->spec[m][M_rsv+1-cur_ind] = 0;
     }
+
+        // for test purpose
+//        int start = 6;
+//        printf("div spec\n");
+//        for (i = 0; i < M+2; i++) {
+//            printf("%12g+%12gi\n", creal(div_s->spec[start][i]), cimag(div_s->spec[start][i]));
+//        }
+//        for (m = 0; m < div_s->sind[2]; m++) {
+//            cur_ind = div_s->sind[0]+m*div_s->sind[1];
+//            for (n = 0; n < M+2-cur_ind; n++) {
+//                if (isnan(creal(div_s->spec[m][n])) || isnan(cimag(div_s->spec[m][n])) ) {
+//                    printf("div spec becomes NaN at m=%d, n=%d\n", m, n);
+//                }        
+//            }
+//        }
+//        printf("\n");
+
 
     return 0;
 }
@@ -95,9 +144,26 @@ int uv_grid_from_div_curl(spec_field *div_s, spec_field *curl_s, legendre *trans
 
     int cur_ind;
 
+
     // transform div, curl back to psi & xi
     laplace_backward(div_s, div_s);
     laplace_backward(curl_s, curl_s);
+
+        // for test purpose
+//        int start = 6;
+//        printf("div spec\n");
+//        for (i = 0; i < M+2; i++) {
+//            printf("%12g+%12gi\n", creal(div_s->spec[start][i]), cimag(div_s->spec[start][i]));
+//        }
+//        for (m = 0; m < div_s->sind[2]; m++) {
+//            cur_ind = div_s->sind[0]+m*div_s->sind[1];
+//            for (n = 0; n < M+2-cur_ind; n++) {
+//                if (creal(div_s->spec[m][n]) != 0 || cimag(div_s->spec[m][n]) != 0 ) {
+//                    printf("div spec becomes Non-Zero at m=%d, n=%d\n", m, n);
+//                }        
+//            }
+//        }
+//        printf("\n");
 
     // calculate spectral U/a, V/a
     for (m = 0; m < div_s->sind[2]; m++) {
@@ -106,7 +172,7 @@ int uv_grid_from_div_curl(spec_field *div_s, spec_field *curl_s, legendre *trans
             u_gp->spec[m][n] = I * (double) cur_ind * div_s->spec[m][n];
             v_gp->spec[m][n] = I * (double) cur_ind * curl_s->spec[m][n];
 
-            if ((n+cur_ind) > 0) {
+            if ( n > 0 ) {
                 eps_mn  = sqrt((double) ((n+cur_ind)*(n+cur_ind) - cur_ind * cur_ind) /
                            (double) (4 * (n+cur_ind)*(n+cur_ind) - 1));
 
@@ -172,7 +238,9 @@ int laplace_backward(spec_field *curl_in, spec_field *psi_out)
     for (m = 0; m < curl_in->sind[2]; m++) {
         cur_ind = curl_in->sind[0]+m*curl_in->sind[1];
         for (n = 0; n < M_rsv+1-cur_ind; n++) {
-            psi_out->spec[m][n] = (-1.0) * curl_in->spec[m][n] / ((double) (n+cur_ind) * (double) (n+1+cur_ind));
+            if ((n+cur_ind) > 0) {
+                psi_out->spec[m][n] = (-1.0) * curl_in->spec[m][n] / ((double) (n+cur_ind) * (double) (n+1+cur_ind));
+            }
         }
 
         // set the unused mode zero
@@ -247,7 +315,7 @@ int multi_mu_to_spec(spec_field *psi_in, spec_field *multi_psi)
         for (n = 0; n < M_rsv+2-cur_ind; n++) {
             multi_psi->spec[m][n] = 0;
 
-            if ((n+cur_ind) > 0) {
+            if (n > 0) {
                 eps_mn  = sqrt((double) ((n+cur_ind)*(n+cur_ind) - cur_ind * cur_ind) /
                            (double) (4 * (n+cur_ind)*(n+cur_ind) - 1));
 
