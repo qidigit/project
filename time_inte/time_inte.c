@@ -40,7 +40,9 @@ int leapfrog_time_inte(spec_field *xi_pre, spec_field *delta_xi, double dt, spec
         }
 
         // set unused mode to be zero
-        xi_post->spec[m][M_rsv+1-cur_ind] = 0;
+        if ((M_rsv+1-cur_ind) > 0) {
+            xi_post->spec[m][M_rsv+1-cur_ind] = 0;
+        }
     }
 
     return 0;

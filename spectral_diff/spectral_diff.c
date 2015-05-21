@@ -110,7 +110,9 @@ int div_spec_from_uv_grid(trans_group *u_gp, trans_group *v_gp, legendre *trans,
             div_s->spec[m][n] /= RADIUS;
         }
         // set the additional unused mode to be zero
-        div_s->spec[m][M_rsv+1-cur_ind] = 0;
+        if ((M_rsv+1-cur_ind) > 0) {
+            div_s->spec[m][M_rsv+1-cur_ind] = 0;
+        }
     }
 
         // for test purpose
@@ -226,7 +228,9 @@ int laplace_forward(spec_field *psi_in, spec_field *curl_out)
         }
 
         // set the unused mode zero
-        curl_out->spec[m][M_rsv+1-cur_ind] = 0;
+        if ((M_rsv+1-cur_ind) > 0) {
+            curl_out->spec[m][M_rsv+1-cur_ind] = 0;
+        }
     }
     return 0;
 }
@@ -244,7 +248,9 @@ int laplace_backward(spec_field *curl_in, spec_field *psi_out)
         }
 
         // set the unused mode zero
-        psi_out->spec[m][M_rsv+1-cur_ind] = 0;
+        if ((M_rsv+1-cur_ind) > 0) {
+            psi_out->spec[m][M_rsv+1-cur_ind] = 0;
+        }
     }
     return 0;
 }
@@ -269,7 +275,9 @@ int laplace_order(spec_field *psi_in, spec_field *psi_out, int lorder)
         }
 
         // set the unused mode zero
-        psi_out->spec[m][M_rsv+1-cur_ind] = 0;
+        if ((M_rsv+1-cur_ind) > 0) {
+            psi_out->spec[m][M_rsv+1-cur_ind] = 0;
+        }
     }
     
     return 0;
@@ -296,7 +304,9 @@ int spectral_damping(spec_field *psi_in, spec_field *incr_out)
         }
 
         // for safety, set the unused mode zero
-        incr_out->spec[m][M_rsv+1-cur_ind] = 0;
+        if ((M_rsv+1-cur_ind) > 0) {
+            incr_out->spec[m][M_rsv+1-cur_ind] = 0;
+        }
     }
     return 0;
 }
